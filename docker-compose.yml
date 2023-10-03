@@ -1,0 +1,51 @@
+services:
+  insaned:
+    container_name: insaned
+    image: gelse/insaned:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Vienna
+      - SSJS_HOST=scanservjs
+    build: .
+    depends_on:
+      - scanservjs
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true
+    restart: unless-stopped
+
+  scanservjs:
+    container_name: scanservjs
+    image: sbs20/scanservjs:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Vienna
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - /dev/bus/usb:/dev/bus/usb
+      - ./images:/app/data/output
+      - ./config:/app/config
+    privileged: true
+    restart: unless-stopped
+#    ports:
+#      - 8080:8080
+    labels:
+      - "traefik.http.routers.scanner.rule=Host(`scanner`)"
+      - "traefik.http.services.scanner.loadbalancer.server.port=8080"
+
+  traefik:
+    container_name: traefik
+    image: traefik:v2.10
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --api.insecure=true --providers.docker
+    ports:
+      # The HTTP port
+      - 80:80
+      # The Web UI (enabled by --api.insecure=true)
+      - 8080:8080
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
